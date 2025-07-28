@@ -1,0 +1,25 @@
+services:
+  voteblocks:
+    build: .
+    ports:
+      - 4000:4000
+    env_file:
+      - .env
+    volumes:
+      - .:/app #for live updates
+      - go-cache:/go/pkg/mod
+    depends_on:
+      db:
+        condition: service_healthy
+    command: air
+  db:
+    image: postgres:17-alpine
+    user: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+
+volumes:
+  db-data:
+  go-cache:

@@ -6,10 +6,19 @@ func (app *application) postVote(w http.ResponseWriter, r *http.Request) {
 	
 }
 
-func (app *application) getPolls(w http.ResponseWriter, r *http.Request) {
+func (app *application) getPoll(w http.ResponseWriter, r *http.Request) {
 	
 }
 
+func (app *application) getAllPolls(w http.ResponseWriter, r *http.Request){
+
+}
+
+
 func (app *application) createPoll(w http.ResponseWriter, r *http.Request) {
+	
+}
+
+func (app *application) editPoll(w http.ResponseWriter, r *http.Request){
 	
 }

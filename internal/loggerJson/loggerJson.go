@@ -81,13 +81,13 @@ func (log *Logger) Print(level Level, message string, properties map[string]stri
 	}
 
 	auxlog := struct {
-		Level      Level             `json:"level"`
+		Level      string             `json:"level"`
 		Time       string            `json:"time"`
 		Message    string            `json:"message"`
 		Properties map[string]string `json:"properties,omitempty"`
 		Trace      string            `json:"trace,omitempty"`
 	}{
-		Level:      level,
+		Level:      level.String(),
 		Time:       time.Now().String(),
 		Message:    message,
 		Properties: properties,
@@ -99,7 +99,7 @@ func (log *Logger) Print(level Level, message string, properties map[string]stri
 
 	var line []byte
 
-	line, err := json.Marshal(auxlog)
+	line, err := json.MarshalIndent(auxlog,""," ")
 
 	if err != nil {
 		line = []byte(LevelError.String() + ":unable to marshall errror json" + err.Error())
