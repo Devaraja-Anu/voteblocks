@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"Github.com/Devaraja-Anu/voteblocks/internal/db"
 	loggerjson "Github.com/Devaraja-Anu/voteblocks/internal/loggerJson"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,9 +29,10 @@ type config struct {
 }
 
 type application struct {
-	cfg    config
-	logger *loggerjson.Logger
-	wg     sync.WaitGroup
+	cfg     config
+	logger  *loggerjson.Logger
+	wg      sync.WaitGroup
+	queries *db.Queries
 }
 
 func main() {
@@ -55,12 +57,20 @@ func main() {
 
 	logger := loggerjson.New(os.Stdout, loggerjson.LevelInfo)
 
-	app := &application{
-		cfg:    cfg,
-		logger: logger,
+	conn, err := openDB(cfg)
+	if err != nil {
+		logger.PrintError(err, nil)
 	}
 
-	err := app.server()
+	queries := db.New(conn)
+
+	app := &application{
+		cfg:     cfg,
+		logger:  logger,
+		queries: queries,
+	}
+
+	err = app.server()
 	if err != nil {
 		logger.PrintFatal(err, nil)
 	}
