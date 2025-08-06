@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"Github.com/Devaraja-Anu/voteblocks/internal/db"
+	"Github.com/Devaraja-Anu/voteblocks/internal/types"
 	"Github.com/Devaraja-Anu/voteblocks/internal/validator"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -35,15 +38,10 @@ func (app *application) createPollhandler(w http.ResponseWriter, r *http.Request
 	}
 
 	if input.Expiry != nil {
-		poll.ExpiresAt = pgtype.Timestamp{
+		poll.ExpiresAt = pgtype.Timestamptz{
 			Time:  *input.Expiry,
 			Valid: true,
 		}
-	} else {
-		poll.ExpiresAt = pgtype.Timestamp{
-			Time:  time.Now().Add(24 * time.Hour),
-			Valid: true,
-		} // NULL in DB
 	}
 
 	v := validator.New()
@@ -82,7 +80,7 @@ func (app *application) getPollHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusCreated, envelope{"poll": returnval}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"poll": returnval}, nil)
 	if err != nil {
 		app.serverError(w, r, err)
 	}
@@ -90,12 +88,59 @@ func (app *application) getPollHandler(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) getAllPollsHandler(w http.ResponseWriter, r *http.Request) {
 
-	// err := app.writeJSON(w, http.StatusCreated, envelope{"id": id}, nil)
-	// if err != nil {
-	// 	app.serverError(w, r, err)
-	// }
+	query := r.URL.Query()
 
-	// ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	// defer cancel()
+	search := query.Get("search")
+	page, err := strconv.Atoi(query.Get("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	pageSize, err := strconv.Atoi(query.Get("page_size"))
+	if err != nil || pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
 
+	v := validator.New()
+	v.Check(page > 0, "page", "must be greater than zero")
+	v.Check(pageSize > 0, "page_size", "must be greater than zero")
+	v.Check(pageSize <= 50, "page_size", "must be a maximum of 50")
+
+	if !v.Valid() {
+		app.failedValidation(w, r, v.Errors)
+		return
+	}
+
+	params := db.ListPollsParams{
+		PlaintoTsquery: search,
+		Limit:          int32(pageSize),
+		Offset:         int32(offset),
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	pollsList, err := app.queries.ListPolls(ctx, params)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	var totalRecords int64
+	if len(pollsList) > 0 {
+		totalRecords = pollsList[0].TotalRecords
+	}
+
+	metadata := types.Metadata{
+		CurrentPage:  page,
+		PageSize:     pageSize,
+		FirstPage:    1,
+		LastPage:     int(math.Ceil(float64(totalRecords) / float64(pageSize))),
+		TotalRecords: int(totalRecords),
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"metadata":metadata,"polls": pollsList}, nil)
+	if err != nil {
+		app.serverError(w, r, err)
+	}
 }

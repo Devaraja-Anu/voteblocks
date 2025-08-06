@@ -18,10 +18,10 @@ RETURNING id, title, description, options, created_at, expires_at, active
 `
 
 type CreatePollParams struct {
-	Title       string           `json:"title"`
-	Description string           `json:"description"`
-	Options     []string         `json:"options"`
-	ExpiresAt   pgtype.Timestamp `json:"expires_at"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Options     []string           `json:"options"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreatePoll(ctx context.Context, arg CreatePollParams) (Poll, error) {
@@ -48,8 +48,8 @@ const deactivateExpiredPolls = `-- name: DeactivateExpiredPolls :exec
 UPDATE polls
 SET active = false
 WHERE active = true
-  AND expires_at IS NOT NULL
-  AND expires_at < now()
+AND expires_at IS NOT NULL
+AND expires_at < now()
 `
 
 func (q *Queries) DeactivateExpiredPolls(ctx context.Context) error {
@@ -77,26 +77,41 @@ func (q *Queries) GetPoll(ctx context.Context, id int64) (Poll, error) {
 }
 
 const listPolls = `-- name: ListPolls :many
-SELECT id, title, description, options, created_at, expires_at, active FROM polls
+SELECT count(*) OVER() AS total_records,
+    id, title, description, options, created_at, expires_at, active FROM polls
 WHERE active = true AND (expires_at IS NULL OR expires_at > now())
-ORDER BY created_at DESC LIMIT $1 OFFSET $2
+AND (to_tsvector('simple',title) @@ plainto_tsquery('simple',$1) OR $1 = '') 
+ORDER BY created_at DESC LIMIT $2 OFFSET $3
 `
 
 type ListPollsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	PlaintoTsquery string `json:"plainto_tsquery"`
+	Limit          int32  `json:"limit"`
+	Offset         int32  `json:"offset"`
 }
 
-func (q *Queries) ListPolls(ctx context.Context, arg ListPollsParams) ([]Poll, error) {
-	rows, err := q.db.Query(ctx, listPolls, arg.Limit, arg.Offset)
+type ListPollsRow struct {
+	TotalRecords int64              `json:"total_records"`
+	ID           int64              `json:"id"`
+	Title        string             `json:"title"`
+	Description  string             `json:"description"`
+	Options      []string           `json:"options"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	Active       bool               `json:"active"`
+}
+
+func (q *Queries) ListPolls(ctx context.Context, arg ListPollsParams) ([]ListPollsRow, error) {
+	rows, err := q.db.Query(ctx, listPolls, arg.PlaintoTsquery, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Poll{}
+	items := []ListPollsRow{}
 	for rows.Next() {
-		var i Poll
+		var i ListPollsRow
 		if err := rows.Scan(
+			&i.TotalRecords,
 			&i.ID,
 			&i.Title,
 			&i.Description,

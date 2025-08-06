@@ -10,14 +10,16 @@ DELETE FROM polls WHERE id = $1;
 SELECT * FROM polls WHERE id = $1;
 
 -- name: ListPolls :many
-SELECT * FROM polls
+SELECT count(*) OVER() AS total_records,
+    id, title, description, options, created_at, expires_at, active FROM polls
 WHERE active = true AND (expires_at IS NULL OR expires_at > now())
-ORDER BY created_at DESC LIMIT $1 OFFSET $2;
+AND (to_tsvector('simple',title) @@ plainto_tsquery('simple',$1) OR $1 = '') 
+ORDER BY created_at DESC LIMIT $2 OFFSET $3;
 
 
 -- name: DeactivateExpiredPolls :exec
 UPDATE polls
 SET active = false
 WHERE active = true
-  AND expires_at IS NOT NULL
-  AND expires_at < now();
+AND expires_at IS NOT NULL
+AND expires_at < now();

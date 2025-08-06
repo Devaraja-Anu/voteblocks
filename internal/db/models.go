@@ -9,11 +9,11 @@ import (
 )
 
 type Poll struct {
-	ID          int64            `json:"id"`
-	Title       string           `json:"title"`
-	Description string           `json:"description"`
-	Options     []string         `json:"options"`
-	CreatedAt   pgtype.Timestamp `json:"created_at"`
-	ExpiresAt   pgtype.Timestamp `json:"expires_at"`
-	Active      bool             `json:"active"`
+	ID          int64              `json:"id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Options     []string           `json:"options"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	Active      bool               `json:"active"`
 }
