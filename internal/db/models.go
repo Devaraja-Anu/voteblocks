@@ -17,3 +17,10 @@ type Poll struct {
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
 	Active      bool               `json:"active"`
 }
+
+type Vote struct {
+	ID        int64              `json:"id"`
+	PollID    int32              `json:"poll_id"`
+	Option    string             `json:"option"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}

@@ -23,3 +23,26 @@ SET active = false
 WHERE active = true
 AND expires_at IS NOT NULL
 AND expires_at < now();
+
+
+-- name: GetPollWithVoteCounts :one
+SELECT 
+    p.id AS poll_id,
+    p.title,
+    p.description,
+    p.options,
+    p.created_at,
+    p.expires_at,
+    p.active,
+    COALESCE(vote_counts.counts, '{}'::jsonb) AS vote_counts
+FROM polls p
+LEFT JOIN LATERAL (
+    SELECT jsonb_object_agg(option, count) AS counts
+    FROM (
+        SELECT option, COUNT(*) AS count
+        FROM votes
+        WHERE poll_id = p.id
+        GROUP BY option
+    ) AS counted_votes
+) AS vote_counts ON TRUE
+WHERE p.id = $1;

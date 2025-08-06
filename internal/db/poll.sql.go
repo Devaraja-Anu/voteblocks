@@ -76,6 +76,56 @@ func (q *Queries) GetPoll(ctx context.Context, id int64) (Poll, error) {
 	return i, err
 }
 
+const getPollWithVoteCounts = `-- name: GetPollWithVoteCounts :one
+SELECT 
+    p.id AS poll_id,
+    p.title,
+    p.description,
+    p.options,
+    p.created_at,
+    p.expires_at,
+    p.active,
+    COALESCE(vote_counts.counts, '{}'::jsonb) AS vote_counts
+FROM polls p
+LEFT JOIN LATERAL (
+    SELECT jsonb_object_agg(option, count) AS counts
+    FROM (
+        SELECT option, COUNT(*) AS count
+        FROM votes
+        WHERE poll_id = p.id
+        GROUP BY option
+    ) AS counted_votes
+) AS vote_counts ON TRUE
+WHERE p.id = $1
+`
+
+type GetPollWithVoteCountsRow struct {
+	PollID      int64              `json:"poll_id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Options     []string           `json:"options"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	Active      bool               `json:"active"`
+	VoteCounts  []byte             `json:"vote_counts"`
+}
+
+func (q *Queries) GetPollWithVoteCounts(ctx context.Context, id int64) (GetPollWithVoteCountsRow, error) {
+	row := q.db.QueryRow(ctx, getPollWithVoteCounts, id)
+	var i GetPollWithVoteCountsRow
+	err := row.Scan(
+		&i.PollID,
+		&i.Title,
+		&i.Description,
+		&i.Options,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.Active,
+		&i.VoteCounts,
+	)
+	return i, err
+}
+
 const listPolls = `-- name: ListPolls :many
 SELECT count(*) OVER() AS total_records,
     id, title, description, options, created_at, expires_at, active FROM polls
