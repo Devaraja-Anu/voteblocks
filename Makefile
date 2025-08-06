@@ -45,7 +45,11 @@ migrate-force:
 
 ## migrate-drop: reset db
 migrate-drop:
-	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" drop -f
+	@if [ -z "$(URL)" ]; then \
+			echo "❌ Error: You must provide the database URL as URL=..."; \
+			exit 1; \
+		fi
+		migrate -path $(MIGRATIONS_DIR) -database "$(URL)" drop -f
 
 ## migrate-status: show current migration version
 migrate-status:

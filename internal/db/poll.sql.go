@@ -12,16 +12,15 @@ import (
 )
 
 const createPoll = `-- name: CreatePoll :one
-INSERT INTO polls (title, description, options, created_by,expires_at)
-VALUES ($1, $2, $3, $4,$5)
-RETURNING id, title, description, options, created_by, created_at, expires_at, active
+INSERT INTO polls (title,description,options,expires_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, title, description, options, created_at, expires_at, active
 `
 
 type CreatePollParams struct {
 	Title       string           `json:"title"`
-	Description *string          `json:"description"`
+	Description string           `json:"description"`
 	Options     []string         `json:"options"`
-	CreatedBy   pgtype.UUID      `json:"created_by"`
 	ExpiresAt   pgtype.Timestamp `json:"expires_at"`
 }
 
@@ -30,7 +29,6 @@ func (q *Queries) CreatePoll(ctx context.Context, arg CreatePollParams) (Poll, e
 		arg.Title,
 		arg.Description,
 		arg.Options,
-		arg.CreatedBy,
 		arg.ExpiresAt,
 	)
 	var i Poll
@@ -39,7 +37,6 @@ func (q *Queries) CreatePoll(ctx context.Context, arg CreatePollParams) (Poll, e
 		&i.Title,
 		&i.Description,
 		&i.Options,
-		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.Active,
@@ -47,11 +44,24 @@ func (q *Queries) CreatePoll(ctx context.Context, arg CreatePollParams) (Poll, e
 	return i, err
 }
 
-const getPoll = `-- name: GetPoll :one
-SELECT id, title, description, options, created_by, created_at, expires_at, active FROM polls WHERE id = $1
+const deactivateExpiredPolls = `-- name: DeactivateExpiredPolls :exec
+UPDATE polls
+SET active = false
+WHERE active = true
+  AND expires_at IS NOT NULL
+  AND expires_at < now()
 `
 
-func (q *Queries) GetPoll(ctx context.Context, id int32) (Poll, error) {
+func (q *Queries) DeactivateExpiredPolls(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deactivateExpiredPolls)
+	return err
+}
+
+const getPoll = `-- name: GetPoll :one
+SELECT id, title, description, options, created_at, expires_at, active FROM polls WHERE id = $1
+`
+
+func (q *Queries) GetPoll(ctx context.Context, id int64) (Poll, error) {
 	row := q.db.QueryRow(ctx, getPoll, id)
 	var i Poll
 	err := row.Scan(
@@ -59,7 +69,6 @@ func (q *Queries) GetPoll(ctx context.Context, id int32) (Poll, error) {
 		&i.Title,
 		&i.Description,
 		&i.Options,
-		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.Active,
@@ -67,43 +76,8 @@ func (q *Queries) GetPoll(ctx context.Context, id int32) (Poll, error) {
 	return i, err
 }
 
-const getPollsByUser = `-- name: GetPollsByUser :many
-SELECT id, title, description, options, created_by, created_at, expires_at, active FROM polls
-WHERE created_by = $1 
-AND (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') ORDER BY created_at DESC
-`
-
-func (q *Queries) GetPollsByUser(ctx context.Context, createdBy pgtype.UUID) ([]Poll, error) {
-	rows, err := q.db.Query(ctx, getPollsByUser, createdBy)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Poll{}
-	for rows.Next() {
-		var i Poll
-		if err := rows.Scan(
-			&i.ID,
-			&i.Title,
-			&i.Description,
-			&i.Options,
-			&i.CreatedBy,
-			&i.CreatedAt,
-			&i.ExpiresAt,
-			&i.Active,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listPolls = `-- name: ListPolls :many
-SELECT id, title, description, options, created_by, created_at, expires_at, active FROM polls
+SELECT id, title, description, options, created_at, expires_at, active FROM polls
 WHERE active = true AND (expires_at IS NULL OR expires_at > now())
 ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
@@ -127,7 +101,6 @@ func (q *Queries) ListPolls(ctx context.Context, arg ListPollsParams) ([]Poll, e
 			&i.Title,
 			&i.Description,
 			&i.Options,
-			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.Active,

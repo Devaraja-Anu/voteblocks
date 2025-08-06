@@ -9,28 +9,11 @@ import (
 )
 
 type Poll struct {
-	ID          int32            `json:"id"`
+	ID          int64            `json:"id"`
 	Title       string           `json:"title"`
-	Description *string          `json:"description"`
+	Description string           `json:"description"`
 	Options     []string         `json:"options"`
-	CreatedBy   pgtype.UUID      `json:"created_by"`
 	CreatedAt   pgtype.Timestamp `json:"created_at"`
 	ExpiresAt   pgtype.Timestamp `json:"expires_at"`
 	Active      bool             `json:"active"`
-}
-
-type User struct {
-	ID        pgtype.UUID      `json:"id"`
-	Username  string           `json:"username"`
-	Email     string           `json:"email"`
-	Password  string           `json:"password"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-}
-
-type Vote struct {
-	ID        int32            `json:"id"`
-	PollID    int32            `json:"poll_id"`
-	UserID    pgtype.UUID      `json:"user_id"`
-	Option    string           `json:"option"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
 }

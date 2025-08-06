@@ -13,11 +13,9 @@ func (app *application) routes() http.Handler {
 
 	r.Get("/healthcheck", app.healthCheck)
 
-	r.Get("/v1/poll", app.getAllPolls)
-	r.Get("/v1/poll/{id}", app.getPoll)
-	r.Post("/v1/polls", app.createPoll)
-	r.Post("/v1poll/{id}/vote", app.postVote)
-	r.Get("/v1/poll/{id}/results", app.getPollResults)
+	r.Get("/v1/polls/{id}", app.getPollHandler)
+	r.Get("/v1/polls", app.getAllPollsHandler)
+	r.Post("/v1/polls", app.createPollhandler)
 
 	return r
 }

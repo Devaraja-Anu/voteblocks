@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"os"
 	"sync"
@@ -41,10 +42,14 @@ func main() {
 
 	var maxOpenConns int
 
-	flag.IntVar(&cfg.port, "Port", 4000, "API server port")
+	val := os.Getenv("LOCAL_DB_URL")
+	if val != "" {
+		cfg.db.dsn = val
+	}
 
+	flag.IntVar(&cfg.port, "Port", 4000, "API server port")
 	flag.StringVar(&cfg.db.dsn, "db-dsn",
-		"postgres://greenlight:pa55word@db:5432/greenlight?sslmode=disable", "PostgreSQL DSN")
+		"postgres://postgres:secret@localhost:5432/prod_db?sslmode=disable", "PostgreSQL DSN")
 	flag.IntVar(&maxOpenConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
 
@@ -59,7 +64,7 @@ func main() {
 
 	conn, err := openDB(cfg)
 	if err != nil {
-		logger.PrintError(err, nil)
+		logger.PrintFatal(err, nil)
 	}
 
 	queries := db.New(conn)
@@ -68,6 +73,10 @@ func main() {
 		cfg:     cfg,
 		logger:  logger,
 		queries: queries,
+	}
+
+	if app.queries == nil {
+		app.logger.PrintFatal(errors.New("app.queries is nil"), nil)
 	}
 
 	err = app.server()

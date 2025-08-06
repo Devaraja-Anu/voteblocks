@@ -18,12 +18,21 @@ func (app *application) readParamId(r *http.Request) (int64, error) {
 
 	param := chi.URLParamFromCtx(r.Context(), "id")
 
-	id, err := strconv.ParseInt(param, 10, 64)
+	id, err := strconv.ParseInt(param, 10, 32)
 	if err != nil || id < 1 {
 		return 0, err
 	}
 	return id, nil
 }
+
+// func (app *application) getEnv(key string) (string, error) {
+// 	val := os.Getenv(key)
+// 	if val == "" {
+// 		errstring := fmt.Errorf("%s ENV val not found", key)
+// 		return "", errstring
+// 	}
+// 	return val, nil
+// }
 
 func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
 

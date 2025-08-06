@@ -9,9 +9,29 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 func (app *application) server() error {
+
+	c := cron.New()
+
+	_, err := c.AddFunc("@hourly", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := app.queries.DeactivateExpiredPolls(ctx)
+		if err != nil {
+			app.logger.PrintError(err, map[string]string{"cron": "deactivateExpiredPolls"})
+		} else {
+			app.logger.PrintInfo("Expired polls deactivated", nil)
+		}
+	})
+
+	if err != nil {
+		app.logger.PrintError(err, map[string]string{"cron": "failed to register cron job"})
+	}
 
 	serv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.cfg.port),
@@ -51,7 +71,7 @@ func (app *application) server() error {
 		"addr": serv.Addr,
 	})
 
-	err := serv.ListenAndServe()
+	err = serv.ListenAndServe()
 
 	if !errors.Is(err, http.ErrServerClosed) {
 		return err
